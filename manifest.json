@@ -1,0 +1,13 @@
+{
+  "name": "E-controle",
+  "short_name": "E-controle",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121315",
+  "theme_color": "#121315",
+  "icons": [
+    { "src": "icone-ec-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icone-ec.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

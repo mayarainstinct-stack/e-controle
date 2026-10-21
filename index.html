@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121315">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>E-controle</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icone-ec-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icone-ec-192.png">
+<style>
+/* E-controle — agenda do dia + escala da equipe, tudo salvo no próprio aparelho.
+   Visual: escuro com verde e dourado. Sem internet, sem servidor. */
+:root {
+  --bg: #121315; --card: #1B1D20; --card2: #24272B; --linha: #2E3237;
+  --fg: #F2F2F0; --muted: #A3A6AA; --verde: #34A43F; --verde-esc: #157A2B; --ouro: #F5B800; --ouro-claro: #FFD84D;
+  --perigo: #E5484D; --r: 14px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 16px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.app { min-height: 100%; display: flex; flex-direction: column; max-width: 720px; margin: 0 auto; }
+header { position: sticky; top: 0; z-index: 5; background: linear-gradient(180deg, #1C1E21, #121315); border-bottom: 2px solid var(--ouro) !important;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 10px; border-bottom: 1px solid var(--linha); }
+.marca { display: flex; align-items: center; gap: 10px; }
+.marca img { width: 34px; height: 34px; }
+.marca h1 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
+.marca h1 span { color: var(--ouro); }
+.marca .quem { flex: 1; min-width: 0; }
+.marca small { color: var(--muted); font-size: 13px; }
+.engrenagem { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--linha); background: var(--card); color: var(--ouro); font-size: 18px; }
+.boas { position: fixed; inset: 0; z-index: 40; background: radial-gradient(circle at 50% 0%, #3A3320, #121315 62%); display: grid; place-items: center; padding: 24px; }
+.boas .caixa { width: 100%; max-width: 420px; display: grid; gap: 12px; text-align: center; }
+.boas img { width: 84px; height: 84px; margin: 0 auto; }
+.boas img.logo-grande { width: min(280px, 80vw); height: auto; filter: drop-shadow(0 8px 24px rgba(0,0,0,.5)); }
+.boas h2 { margin: 0; font-size: 24px; } .boas h2 span { color: var(--ouro); }
+.boas p { margin: 0; color: var(--muted); }
+.boas label { text-align: left; }
+.pessoa-card { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--linha); border-radius: var(--r); padding: 12px; }
+.av { width: 42px; height: 42px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; background: var(--card2); color: var(--ouro); border: 2px solid var(--ouro); }
+.barra { height: 6px; border-radius: 999px; background: var(--card2); overflow: hidden; margin-top: 6px; }
+.barra i { display: block; height: 100%; background: linear-gradient(90deg, var(--ouro), var(--ouro-claro)); }
+.abas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+.abas button { border: 1px solid var(--linha); background: var(--card); border-radius: 999px; padding: 9px 6px; font-weight: 600; font-size: 14px; color: var(--muted); }
+.abas button[aria-selected="true"] { background: var(--ouro); border-color: var(--ouro); color: #1A1406; }
+main { flex: 1; padding: 14px 16px calc(96px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; align-content: start; }
+.dia-nav { display: flex; align-items: center; gap: 8px; }
+.dia-nav button { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--linha); background: var(--card); font-size: 18px; }
+.dia-nav .titulo { flex: 1; text-align: center; }
+.dia-nav .titulo b { display: block; font-size: 17px; text-transform: capitalize; }
+.dia-nav .titulo small { color: var(--muted); }
+.hoje-btn { border: 1px solid var(--ouro); color: var(--ouro); background: none; border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+.resumo { display: flex; gap: 8px; }
+.resumo div { flex: 1; background: var(--card); border: 1px solid var(--linha); border-radius: var(--r); padding: 10px; text-align: center; }
+.resumo b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.resumo .ok b { color: var(--verde); } .resumo .pend b { color: var(--ouro); }
+.resumo small { color: var(--muted); font-size: 12px; }
+.lista { display: grid; gap: 8px; }
+.item { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--linha); border-left: 4px solid var(--ouro);
+  border-radius: var(--r); padding: 12px; }
+.item.feito { border-left-color: var(--verde); opacity: .62; }
+.item.feito .t { text-decoration: line-through; }
+.check { width: 30px; height: 30px; flex: none; border-radius: 50%; border: 2px solid var(--ouro); background: none; display: grid; place-items: center; font-weight: 800; }
+.item.feito .check { background: var(--verde); border-color: var(--verde); color: #0E1411; }
+.item .info { flex: 1; min-width: 0; }
+.item .t { font-weight: 600; overflow-wrap: anywhere; }
+.item .m { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.hora { color: var(--ouro-claro); font-variant-numeric: tabular-nums; font-weight: 700; }
+.mais { width: 34px; height: 34px; border-radius: 10px; border: 0; background: var(--card2); color: var(--muted); }
+.vazio { text-align: center; color: var(--muted); padding: 28px 10px; border: 1px dashed var(--linha); border-radius: var(--r); }
+.vazio b { color: var(--fg); display: block; margin-bottom: 4px; }
+.fab { position: fixed; right: max(16px, calc(50vw - 344px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 6;
+  height: 56px; padding: 0 22px; border-radius: 999px; border: 0; background: linear-gradient(135deg, var(--ouro-claro), var(--ouro));
+  color: #1A1406; font-weight: 800; font-size: 16px; box-shadow: 0 6px 18px rgba(0,0,0,.45), inset 0 0 0 1px rgba(212,175,55,.5); }
+.secao h2 { margin: 6px 0 8px; font-size: 15px; color: var(--ouro); text-transform: uppercase; letter-spacing: .06em; }
+.semana { display: grid; gap: 8px; }
+.dia-card { background: var(--card); border: 1px solid var(--linha); border-radius: var(--r); padding: 10px 12px; }
+.dia-card h3 { margin: 0 0 6px; font-size: 14px; text-transform: capitalize; display: flex; justify-content: space-between; }
+.dia-card h3 small { color: var(--muted); font-weight: 400; }
+.turno { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--linha); font-size: 14px; }
+.turno:first-of-type { border-top: 0; }
+.turno .p { font-weight: 700; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.turno .f { color: var(--muted); font-size: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--linha); background: var(--card); border-radius: 999px; padding: 7px 12px; font-size: 14px; }
+.chip.on { border-color: var(--ouro); color: var(--ouro); }
+.botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn { border: 1px solid var(--linha); background: var(--card); border-radius: 12px; padding: 12px; font-weight: 600; text-align: center; }
+.btn.ouro { border-color: var(--ouro); color: var(--ouro); }
+.btn.verde { background: var(--ouro); border-color: var(--ouro); color: #1A1406; }
+.btn.perigo { color: var(--perigo); border-color: color-mix(in srgb, var(--perigo) 50%, var(--linha)); }
+pre.export { white-space: pre-wrap; background: var(--card2); border: 1px solid var(--linha); border-radius: var(--r); padding: 12px; font-size: 13px; max-height: 50vh; overflow: auto; }
+/* folha de cadastro */
+.fundo { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 20; display: grid; align-items: end; }
+.folha { background: var(--card); border-top: 2px solid var(--ouro); border-radius: 20px 20px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  display: grid; gap: 10px; max-width: 720px; width: 100%; margin: 0 auto; max-height: 92vh; overflow: auto; animation: subir .22s ease-out; }
+@keyframes subir { from { transform: translateY(40px); opacity: .4; } }
+.folha h2 { margin: 0; font-size: 18px; }
+label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+input, select, textarea { background: var(--bg); border: 1px solid var(--linha); border-radius: 12px; padding: 12px; color: var(--fg); width: 100%; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--verde); }
+.dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(90px + env(safe-area-inset-bottom, 0px)); background: var(--ouro); color: #1A1406;
+  padding: 10px 16px; border-radius: 999px; font-weight: 700; z-index: 30; }
+.pinceis { display: flex; flex-wrap: wrap; gap: 6px; }
+.pincel { border: 1px solid var(--linha); background: var(--card); border-radius: 10px; padding: 8px 10px; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.pincel.on { outline: 2px solid var(--ouro); outline-offset: 1px; }
+.pincel.p-folga { background: #E6C229; color: #1A1406; border-color: #E6C229; }
+.pincel.p-noite { background: #2B59C3; color: #fff; border-color: #2B59C3; }
+.pincel.p-apagar { color: var(--perigo); }
+.dica-grade { margin: 0; color: var(--muted); font-size: 13px; }
+.grade-wrap { overflow-x: auto; border: 1px solid var(--linha); border-radius: var(--r); -webkit-overflow-scrolling: touch; }
+.grade { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 13px; font-variant-numeric: tabular-nums; touch-action: none; user-select: none; -webkit-user-select: none; }
+.grade th, .grade td { border: 1px solid var(--linha); padding: 0; text-align: center; height: 38px; }
+.grade thead th { background: #2A2D31; color: var(--ouro-claro); color: #fff; font-weight: 700; padding: 4px 2px; text-transform: capitalize; }
+.grade thead th small { display: block; font-weight: 400; opacity: .8; font-size: 11px; }
+.grade thead th.th-dom { background: #3A3320; }
+.grade tbody th { text-align: left; padding: 0 8px; background: var(--card2); white-space: nowrap; font-weight: 600; position: sticky; left: 0; z-index: 1; }
+.grade .cel { cursor: pointer; font-weight: 700; min-width: 58px; }
+.grade .cel.vaz { background: var(--bg); }
+.grade .cel.folga { background: #E6C229; color: #1A1406; }
+.grade .cel.noite { background: #2B59C3; color: #fff; }
+.grade .cel.dom { background: #3A3320; color: var(--ouro-claro); }
+.grade .tot { color: var(--ouro); font-weight: 800; padding: 0 6px; white-space: nowrap; }
+.dias-semana { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.ds { position: relative; border: 1px solid var(--linha); background: var(--card); border-radius: 12px; padding: 6px 0; display: grid; gap: 1px; justify-items: center; }
+.ds small { font-size: 11px; color: var(--muted); text-transform: capitalize; }
+.ds b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.ds.hoje b { color: var(--ouro); }
+.ds.on { background: var(--ouro); border-color: var(--ouro); color: #1A1406; }
+.ds.on small { color: #3A2E05; }
+.ds.on b, .ds.on.hoje b { color: #1A1406; }
+.ds.on i { background: #1A1406; color: var(--ouro-claro); }
+.pincel.on.p-folga { outline-color: #fff; }
+.ds i { position: absolute; top: -5px; right: -3px; min-width: 18px; height: 18px; border-radius: 999px; background: var(--ouro); color: #1A1406; font-style: normal; font-size: 11px; font-weight: 800; display: grid; place-items: center; padding: 0 4px; }
+.dias-rep { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.dr { display: block; }
+.dr input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.dr span { display: block; text-align: center; padding: 9px 0; border-radius: 10px; border: 1px solid var(--linha); background: var(--bg); color: var(--fg); text-transform: capitalize; font-size: 13px; font-weight: 600; }
+.dr input:checked + span { background: var(--ouro); border-color: var(--ouro); color: #1A1406; }
+.passo { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--ouro); margin-top: 4px; }
+.passo span { width: 24px; height: 24px; border-radius: 50%; background: var(--ouro); color: #1A1406; display: grid; place-items: center; font-size: 13px; }
+.sel-grande { font-size: 17px; padding: 14px; border-radius: 14px; }
+.acoes-exp { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.grande { border: 1px solid var(--linha); background: var(--card); border-radius: 16px; padding: 14px 6px; display: grid; gap: 6px; justify-items: center; font-weight: 700; }
+.grande b { font-size: 26px; }
+.grande.verde { background: var(--ouro); border-color: var(--ouro); color: #1A1406; }
+.previa-box summary { cursor: pointer; color: var(--muted); padding: 6px 0; }
+.exp-pag { width: 100%; border-style: dashed; color: var(--ouro); border-color: color-mix(in srgb, var(--ouro) 45%, var(--linha)); }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="marca"><img src="icone-ec-192.png" alt=""><div class="quem"><h1 id="titulo-app">E-<span>controle</span></h1><small id="ola"></small></div>
+      <button class="engrenagem" id="ajustes" aria-label="Ajustes">⚙</button></div>
+    <nav class="abas" role="tablist">
+      <button role="tab" data-aba="agenda" aria-selected="true">Agenda</button>
+      <button role="tab" data-aba="escala" aria-selected="false">Horas</button>
+      <button role="tab" data-aba="equipe" aria-selected="false">Equipe</button>
+      <button role="tab" data-aba="exportar" aria-selected="false">Exportar</button>
+    </nav>
+  </header>
+  <main id="tela"></main>
+</div>
+<button class="fab" id="fab">+ Atividade</button>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+// ---------- dados (tudo no aparelho) ----------
+const CHAVE = 'e-controle-v1';
+const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+let dados = { atividades: [], pessoas: [], turnos: [], equipe: [], config: { nome: '', empresa: 'Minha empresa', semana: 'seg', jornada: 8 } };
+try { const salvo = JSON.parse(localStorage.getItem(CHAVE) || 'null'); if (salvo) dados = Object.assign(dados, salvo); } catch (e) {}
+dados.config = Object.assign({ nome: '', empresa: 'Minha empresa', semana: 'seg', jornada: 8 }, dados.config || {});
+const EQUIPE_PADRAO = [];   // versão pública: sem nomes de ninguém
+dados.equipe = dados.equipe || [];
+(dados.pessoas || []).forEach(n => { if (!dados.equipe.some(f => f.nome === n)) dados.equipe.push({ id: Math.random().toString(36).slice(2), nome: n, funcao: '', tel: '', meta: 44 }); });
+Object.defineProperty(dados, 'pessoas', { get: () => dados.equipe.map(f => f.nome), set: () => {}, enumerable: false, configurable: true });
+function salvar() { try { localStorage.setItem(CHAVE, JSON.stringify(dados)); } catch (e) { aviso('Não deu pra salvar no aparelho'); } }
+const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const pad = n => String(n).padStart(2, '0');
+const isoDia = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const deIso = s => { const [a, m, d] = s.split('-').map(Number); return new Date(a, m - 1, d); };
+const br = s => { const d = deIso(s); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); };
+const inicioSemana = d => { const x = new Date(d); const volta = dados.config.semana === 'seg' ? (x.getDay() + 6) % 7 : x.getDay(); x.setDate(x.getDate() - volta); x.setHours(0, 0, 0, 0); return x; };
+const horas = t => { if (t.folga) return 0; const [a, b] = t.inicio.split(':').map(Number), [c, d] = t.fim.split(':').map(Number); let m = (c * 60 + d) - (a * 60 + b); if (m < 0) m += 1440; return m / 60; };
+const fmtH = h => { const m = Math.round(h * 60); return Math.floor(m / 60) + 'h' + (m % 60 ? pad(m % 60) : ''); };
+const iniciais = n => n.trim().split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase();
+function aviso(t) { const el = document.getElementById('toast'); el.textContent = t; el.hidden = false; clearTimeout(aviso.t); aviso.t = setTimeout(() => el.hidden = true, 1800); }
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---------- navegação ----------
+let aba = 'agenda', diaVisto = isoDia(new Date()), semanaVista = inicioSemana(new Date()), filtroPessoa = '';
+document.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { aba = b.dataset.aba; desenhar(); });
+document.getElementById('fab').onclick = () => aba === 'escala' ? folhaTurno() : aba === 'equipe' ? folhaFuncionario() : folhaAtividade();
+
+function desenhar() {
+  document.querySelectorAll('[data-aba]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.aba === aba)));
+  const fab = document.getElementById('fab');
+  fab.hidden = aba === 'exportar';
+  fab.textContent = aba === 'escala' ? '+ Horário' : aba === 'equipe' ? '+ Funcionário' : '+ Atividade';
+  document.getElementById('ola').textContent = dados.config.nome ? 'Olá, ' + dados.config.nome + ' · ' + dados.config.empresa : dados.config.empresa;
+  ({ agenda: telaAgenda, escala: telaEscala, equipe: telaEquipe, exportar: telaExportar })[aba]();
+}
+
+// ---------- AGENDA ----------
+function telaAgenda() {
+  const d = deIso(diaVisto);
+  const doDia = dados.atividades.filter(a => a.data === diaVisto).sort((a, b) => (a.hora || '99').localeCompare(b.hora || '99'));
+  const feitos = doDia.filter(a => a.feito).length;
+  const ehHoje = diaVisto === isoDia(new Date());
+  document.getElementById('tela').innerHTML = `
+    <div class="dia-nav">
+      <button id="ant" aria-label="Dia anterior">‹</button>
+      <div class="titulo"><b>${ehHoje ? 'Hoje' : DIAS[d.getDay()]}</b><small>${br(diaVisto)}</small>
+        ${ehHoje ? '' : '<div><button class="hoje-btn" id="hoje">voltar pra hoje</button></div>'}</div>
+      <button id="prox" aria-label="Próximo dia">›</button>
+    </div>
+    <div class="dias-semana">${(() => { const ini = inicioSemana(d); return [...Array(7)].map((_, i) => { const x = new Date(ini); x.setDate(x.getDate() + i); const iso = isoDia(x);
+      const n = dados.atividades.filter(a => a.data === iso && !a.feito).length;
+      return `<button class="ds ${iso === diaVisto ? 'on' : ''} ${iso === isoDia(new Date()) ? 'hoje' : ''}" data-dia="${iso}"><small>${DIAS[x.getDay()].slice(0, 3)}</small><b>${x.getDate()}</b>${n ? `<i>${n}</i>` : ''}</button>`; }).join(''); })()}</div>
+    <div class="resumo">
+      <div class="pend"><b>${doDia.length - feitos}</b><small>a fazer</small></div>
+      <div class="ok"><b>${feitos}</b><small>feitas</small></div>
+      <div><b>${doDia.length}</b><small>no dia</small></div>
+    </div>
+    <button class="btn exp-pag" id="exp-agenda">⬇ Exportar atividades do dia</button>
+    <div class="lista">${doDia.length ? doDia.map(a => `
+      <div class="item ${a.feito ? 'feito' : ''}">
+        <button class="check" data-check="${a.id}" aria-label="Marcar como feita">${a.feito ? '✓' : ''}</button>
+        <div class="info"><div class="t">${esc(a.titulo)}</div>
+          <div class="m">${a.hora ? `<span class="hora">${a.hora}</span> · ` : ''}${a.pessoa ? esc(a.pessoa) : 'sem responsável'}${a.obs ? ' · ' + esc(a.obs) : ''}</div></div>
+        <button class="mais" data-editar="${a.id}" aria-label="Editar">✎</button>
+      </div>`).join('') : `<div class="vazio"><b>Nada marcado pra este dia</b>Toca em “+ Atividade” pra lançar o que tem que fazer.</div>`}</div>`;
+  const mudaDia = n => { const x = deIso(diaVisto); x.setDate(x.getDate() + n); diaVisto = isoDia(x); desenhar(); };
+  document.getElementById('ant').onclick = () => mudaDia(-1);
+  document.getElementById('prox').onclick = () => mudaDia(1);
+  document.querySelectorAll('[data-dia]').forEach(b => b.onclick = () => { diaVisto = b.dataset.dia; desenhar(); });
+  document.getElementById('exp-agenda').onclick = () => {
+    const t = `${dados.config.empresa.toUpperCase()} — ATIVIDADES ${DIAS[d.getDay()].toUpperCase()} ${br(diaVisto)}\n\n` +
+      (doDia.length ? doDia.map(a => `${a.feito ? '✅' : '⬜'} ${a.hora || '--:--'}  ${a.titulo}${a.pessoa ? ' — ' + a.pessoa : ''}${a.obs ? ' (' + a.obs + ')' : ''}`).join('\n') : 'Nada marcado.');
+    const c = 'Data;Hora;Atividade;Responsável;Observação;Feita\n' + doDia.map(a => [br(a.data), a.hora, a.titulo, a.pessoa, a.obs, a.feito ? 'sim' : 'não'].join(';')).join('\n');
+    exportarPagina('Agenda', t, c, 'atividades-' + br(diaVisto).replace(/\//g, '-'));
+  };
+  const h = document.getElementById('hoje'); if (h) h.onclick = () => { diaVisto = isoDia(new Date()); desenhar(); };
+  document.querySelectorAll('[data-check]').forEach(b => b.onclick = () => { const a = dados.atividades.find(x => x.id === b.dataset.check); a.feito = !a.feito; salvar(); desenhar(); });
+  document.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => folhaAtividade(dados.atividades.find(x => x.id === b.dataset.editar)));
+}
+
+function folhaAtividade(a) {
+  const nova = !a;
+  a = a || { id: id(), titulo: '', data: diaVisto, hora: '', pessoa: '', obs: '', repetir: 'nao', feito: false };
+  abrirFolha(`
+    <h2>${nova ? 'Nova atividade' : 'Editar atividade'}</h2>
+    <label>O que tem que fazer<input id="f-titulo" value="${esc(a.titulo)}" placeholder="Ex.: Receber entrega de frutas" required></label>
+    <div class="dupla"><label>Dia<input id="f-data" type="date" value="${a.data}"></label><label>Hora<input id="f-hora" type="time" value="${a.hora}"></label></div>
+    <label>Responsável<input id="f-pessoa" list="lista-pessoas" value="${esc(a.pessoa)}" placeholder="Opcional"></label>
+    <datalist id="lista-pessoas">${dados.pessoas.map(p => `<option value="${esc(p)}">`).join('')}</datalist>
+    <label>Observação<input id="f-obs" value="${esc(a.obs)}" placeholder="Opcional"></label>
+    ${nova ? `<label>Repetir nos dias da semana (por 8 semanas)</label>
+      <div class="dias-rep">${[1, 2, 3, 4, 5, 6, 0].map(n => `<label class="dr"><input type="checkbox" value="${n}"><span>${DIAS[n].slice(0, 3)}</span></label>`).join('')}</div>
+      <small class="dica-grade">Deixa sem marcar pra ser só no dia escolhido.</small>` : ''}
+    <div class="botoes">${nova ? '' : '<button class="btn perigo" id="f-apagar">Apagar</button>'}<button class="btn verde" id="f-salvar" ${nova ? 'style="grid-column: 1 / -1"' : ''}>Salvar</button></div>`);
+  document.getElementById('f-salvar').onclick = () => {
+    const titulo = document.getElementById('f-titulo').value.trim();
+    if (!titulo) { aviso('Escreve o que tem que fazer'); return; }
+    Object.assign(a, { titulo, data: document.getElementById('f-data').value || diaVisto, hora: document.getElementById('f-hora').value,
+      pessoa: document.getElementById('f-pessoa').value.trim(), obs: document.getElementById('f-obs').value.trim() });
+    if (a.pessoa && !dados.pessoas.includes(a.pessoa)) dados.pessoas.push(a.pessoa);
+    if (nova) {
+      const diasRep = [...document.querySelectorAll('.dias-rep input:checked')].map(x => Number(x.value));
+      if (!diasRep.length) dados.atividades.push(Object.assign({}, a, { id: id() }));
+      else for (let i = 0; i < 56; i++) { const d = deIso(a.data); d.setDate(d.getDate() + i); if (diasRep.includes(d.getDay())) dados.atividades.push(Object.assign({}, a, { id: id(), data: isoDia(d) })); }
+    }
+    salvar(); fecharFolha(); aviso('Salvo'); diaVisto = a.data; desenhar();
+  };
+  const ap = document.getElementById('f-apagar');
+  if (ap) ap.onclick = () => { dados.atividades = dados.atividades.filter(x => x.id !== a.id); salvar(); fecharFolha(); aviso('Apagada'); desenhar(); };
+}
+
+// ---------- ESCALA ----------
+function turnosDaSemana(ini) {
+  const fim = new Date(ini); fim.setDate(fim.getDate() + 7);
+  return dados.turnos.filter(t => { const d = deIso(t.data); return d >= ini && d < fim; })
+    .sort((a, b) => (a.data + a.inicio).localeCompare(b.data + b.inicio));
+}
+const PINCEIS = ['06:00', '07:00', '08:00', '10:00', '13:00', '20:30', 'FOLGA', 'apagar'];
+let pincel = '06:00';
+function somaHora(h, mais) { const [a, b] = h.split(':').map(Number); const m = (a * 60 + b + Math.round(mais * 60)) % 1440; return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+function celula(p, dia) { return dados.turnos.find(t => t.pessoa === p && t.data === dia); }
+function pintar(p, dia) {
+  dados.turnos = dados.turnos.filter(t => !(t.pessoa === p && t.data === dia));
+  if (pincel === 'apagar') return;
+  if (pincel === 'FOLGA') dados.turnos.push({ id: id(), pessoa: p, data: dia, folga: true, inicio: '', fim: '', funcao: '' });
+  else dados.turnos.push({ id: id(), pessoa: p, data: dia, folga: false, inicio: pincel, fim: somaHora(pincel, dados.config.jornada || 8), funcao: '' });
+}
+function telaEscala() {
+  const ini = semanaVista, fim = new Date(ini); fim.setDate(fim.getDate() + 6);
+  const dias = [...Array(7)].map((_, i) => { const d = new Date(ini); d.setDate(d.getDate() + i); return isoDia(d); });
+  const ts = turnosDaSemana(ini);
+  const linhas = dados.equipe.map(f => {
+    const tot = ts.filter(t => t.pessoa === f.nome).reduce((s, t) => s + horas(t), 0);
+    return `<tr><th>${esc(f.nome)}</th>${dias.map(dia => { const c = celula(f.nome, dia); const dom = deIso(dia).getDay() === 0;
+      const cls = !c ? 'vaz' : c.folga ? 'folga' : (c.inicio >= '18:00' ? 'noite' : (dom ? 'dom' : ''));
+      return `<td class="cel ${cls}" data-p="${esc(f.nome)}" data-d="${dia}">${!c ? '' : c.folga ? 'FOLGA' : c.inicio}</td>`; }).join('')}
+      <td class="tot">${fmtH(tot)}</td></tr>`; }).join('');
+  document.getElementById('tela').innerHTML = `
+    <div class="dia-nav">
+      <button id="ant" aria-label="Semana anterior">‹</button>
+      <div class="titulo"><b>Escala da semana</b><small>${br(isoDia(ini))} a ${br(isoDia(fim))}</small></div>
+      <button id="prox" aria-label="Próxima semana">›</button>
+    </div>
+    <div class="pinceis">${PINCEIS.map(v => `<button class="pincel ${v === pincel ? 'on' : ''} ${v === 'FOLGA' ? 'p-folga' : v === 'apagar' ? 'p-apagar' : v >= '18:00' ? 'p-noite' : ''}" data-pincel="${v}">${v === 'apagar' ? '✕ limpar' : v}</button>`).join('')}
+      <button class="pincel" id="outro-hor">outro…</button></div>
+    <p class="dica-grade">Escolhe o horário em cima e toca (ou arrasta o dedo) nos quadradinhos. Cada turno conta ${dados.config.jornada || 8}h.</p>
+    ${dados.equipe.length ? `<div class="grade-wrap"><table class="grade"><thead><tr><th>Funcionário</th>${dias.map(dia => { const d = deIso(dia); return `<th class="${d.getDay() === 0 ? 'th-dom' : ''}">${DIAS[d.getDay()].slice(0, 3)}<small>${br(dia).slice(0, 5)}</small></th>`; }).join('')}<th>Total</th></tr></thead>
+      <tbody>${linhas}</tbody></table></div>` : `<div class="vazio"><b>Sem funcionários</b>Cadastra a equipe na aba Equipe.</div>`}
+    <div class="botoes"><button class="btn ouro" id="copiar-semana">Copiar semana anterior</button><button class="btn" id="exp-horas">⬇ Exportar escala</button></div>`;
+  const muda = n => { const x = new Date(semanaVista); x.setDate(x.getDate() + 7 * n); semanaVista = x; desenhar(); };
+  document.getElementById('ant').onclick = () => muda(-1);
+  document.getElementById('prox').onclick = () => muda(1);
+  document.getElementById('exp-horas').onclick = () => exportarPagina('Escala da semana', textoEscala(''), csvEscala(''), 'escala-' + br(isoDia(semanaVista)).replace(/\//g, '-'));
+  document.querySelectorAll('[data-pincel]').forEach(b => b.onclick = () => { pincel = b.dataset.pincel; desenhar(); });
+  document.getElementById('outro-hor').onclick = () => {
+    abrirFolha(`<h2>Outro horário</h2><label>Entra às<input id="o-hora" type="time" value="09:00"></label><button class="btn verde" id="o-ok">Usar este horário</button>`);
+    document.getElementById('o-ok').onclick = () => { const v = document.getElementById('o-hora').value; if (v) { pincel = v; if (!PINCEIS.includes(v)) PINCEIS.splice(PINCEIS.length - 2, 0, v); } fecharFolha(); desenhar(); };
+  };
+  // tocar e arrastar pintando
+  const grade = document.querySelector('.grade');
+  if (grade) {
+    let pintando = false, ultimo = '';
+    const em = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.classList && el.classList.contains('cel') ? el : null; };
+    const aplica = el => { if (!el) return; const k = el.dataset.p + '|' + el.dataset.d; if (k === ultimo) return; ultimo = k; pintar(el.dataset.p, el.dataset.d);
+      const c = celula(el.dataset.p, el.dataset.d); el.textContent = !c ? '' : c.folga ? 'FOLGA' : c.inicio;
+      el.className = 'cel ' + (!c ? 'vaz' : c.folga ? 'folga' : (c.inicio >= '18:00' ? 'noite' : (deIso(el.dataset.d).getDay() === 0 ? 'dom' : ''))); };
+    grade.addEventListener('pointerdown', e => { const el = em(e.clientX, e.clientY); if (!el) return; e.preventDefault(); pintando = true; ultimo = ''; aplica(el); });
+    grade.addEventListener('pointermove', e => { if (pintando) aplica(em(e.clientX, e.clientY)); });
+    const para = () => { if (!pintando) return; pintando = false; salvar(); desenhar(); };
+    window.addEventListener('pointerup', para, { once: true }); grade.addEventListener('pointerup', para); grade.addEventListener('pointercancel', para);
+  }
+  document.getElementById('copiar-semana').onclick = () => {
+    const ant = new Date(semanaVista); ant.setDate(ant.getDate() - 7);
+    const velhos = turnosDaSemana(ant);
+    if (!velhos.length) { aviso('A semana anterior está vazia'); return; }
+    velhos.forEach(t => { const d = deIso(t.data); d.setDate(d.getDate() + 7); const dia = isoDia(d);
+      dados.turnos = dados.turnos.filter(x => !(x.pessoa === t.pessoa && x.data === dia)); dados.turnos.push(Object.assign({}, t, { id: id(), data: dia })); });
+    salvar(); aviso('Semana copiada'); desenhar();
+  };
+}
+function folhaPessoa() {
+  abrirFolha(`<h2>Nova pessoa da equipe</h2><label>Nome<input id="f-nome" placeholder="Ex.: Ana"></label>
+    <button class="btn verde" id="f-salvar">Adicionar</button>
+    ${dados.pessoas.length ? `<label>Já cadastrados</label><div class="chips">${dados.pessoas.map(p => `<button class="chip" data-tirar="${esc(p)}">${esc(p)} ✕</button>`).join('')}</div>` : ''}`);
+  document.getElementById('f-salvar').onclick = () => { const n = document.getElementById('f-nome').value.trim(); if (!n) return;
+    if (!dados.pessoas.includes(n)) dados.pessoas.push(n); salvar(); fecharFolha(); desenhar(); };
+  document.querySelectorAll('[data-tirar]').forEach(b => b.onclick = () => { dados.pessoas = dados.pessoas.filter(p => p !== b.dataset.tirar); salvar(); fecharFolha(); desenhar(); });
+}
+function folhaTurno(t) {
+  const novo = !t;
+  if (!dados.pessoas.length && novo) { folhaFuncionario(); aviso('Cadastra a equipe primeiro'); return; }
+  t = t || { id: id(), pessoa: filtroPessoa || dados.pessoas[0] || '', data: isoDia(semanaVista), inicio: '08:00', fim: '17:00', funcao: '' };
+  abrirFolha(`<h2>${novo ? 'Novo turno' : 'Editar turno'}</h2>
+    <label>Pessoa<select id="f-pessoa">${dados.pessoas.map(p => `<option ${p === t.pessoa ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>
+    <label>Dia<input id="f-data" type="date" value="${t.data}"></label>
+    <div class="dupla"><label>Entra<input id="f-ini" type="time" value="${t.inicio}"></label><label>Sai<input id="f-fim" type="time" value="${t.fim}"></label></div>
+    <label>Função<input id="f-funcao" value="${esc(t.funcao)}" placeholder="Ex.: caixa, reposição (opcional)"></label>
+    <div class="botoes">${novo ? '' : '<button class="btn perigo" id="f-apagar">Apagar</button>'}<button class="btn verde" id="f-salvar" ${novo ? 'style="grid-column: 1 / -1"' : ''}>Salvar</button></div>`);
+  document.getElementById('f-salvar').onclick = () => {
+    Object.assign(t, { pessoa: document.getElementById('f-pessoa').value, data: document.getElementById('f-data').value,
+      inicio: document.getElementById('f-ini').value, fim: document.getElementById('f-fim').value, funcao: document.getElementById('f-funcao').value.trim() });
+    if (!t.data || !t.inicio || !t.fim) { aviso('Preenche dia e horário'); return; }
+    if (novo) dados.turnos.push(t);
+    salvar(); fecharFolha(); aviso('Turno salvo'); semanaVista = inicioSemana(deIso(t.data)); desenhar();
+  };
+  const ap = document.getElementById('f-apagar');
+  if (ap) ap.onclick = () => { dados.turnos = dados.turnos.filter(x => x.id !== t.id); salvar(); fecharFolha(); desenhar(); };
+}
+
+// ---------- EQUIPE (cadastro de funcionários + horas da semana) ----------
+function telaEquipe() {
+  const ts = turnosDaSemana(semanaVista);
+  document.getElementById('tela').innerHTML = `
+    <div class="secao"><h2>Funcionários · horas desta semana</h2></div>
+    <button class="btn exp-pag" id="exp-equipe">⬇ Exportar equipe e horas</button>
+    <div class="lista">${dados.equipe.length ? dados.equipe.map(f => { const h = ts.filter(t => t.pessoa === f.nome).reduce((s, t) => s + horas(t), 0); const pct = f.meta ? Math.min(100, h / f.meta * 100) : 0; return `
+      <div class="pessoa-card"><div class="av">${esc(iniciais(f.nome))}</div>
+        <div class="info" style="flex:1;min-width:0"><div class="t"><b>${esc(f.nome)}</b></div>
+          <div class="m">${esc(f.funcao || 'sem função')}${f.tel ? ' · ' + esc(f.tel) : ''}</div>
+          <div class="m"><span class="hora">${fmtH(h)}</span> de ${f.meta || 0}h na semana</div>
+          <div class="barra"><i style="width:${pct}%"></i></div></div>
+        <button class="mais" data-func="${f.id}" aria-label="Editar">✎</button></div>`; }).join('') : `<div class="vazio"><b>Nenhum funcionário ainda</b>Toca em “+ Funcionário” pra cadastrar a equipe.</div>`}</div>`;
+  document.querySelectorAll('[data-func]').forEach(b => b.onclick = () => folhaFuncionario(dados.equipe.find(f => f.id === b.dataset.func)));
+  document.getElementById('exp-equipe').onclick = () => {
+    const hs = f => ts.filter(t => t.pessoa === f.nome).reduce((s, t) => s + horas(t), 0);
+    const t = `${dados.config.empresa.toUpperCase()} — EQUIPE (semana de ${br(isoDia(semanaVista))})\n\n` + dados.equipe.map(f => `• ${f.nome}${f.funcao ? ' — ' + f.funcao : ''}: ${fmtH(hs(f))} de ${f.meta}h${f.tel ? ' · ' + f.tel : ''}`).join('\n');
+    const c = 'Nome;Função;Telefone;Horas na semana;Meta\n' + dados.equipe.map(f => [f.nome, f.funcao, f.tel, fmtH(hs(f)), f.meta].join(';')).join('\n');
+    exportarPagina('Equipe', t, c, 'equipe-' + br(isoDia(semanaVista)).replace(/\//g, '-'));
+  };
+}
+function folhaFuncionario(f) {
+  const novo = !f;
+  f = f || { id: id(), nome: '', funcao: '', tel: '', meta: 44 };
+  const nomeAntigo = f.nome;
+  abrirFolha(`<h2>${novo ? 'Novo funcionário' : 'Editar funcionário'}</h2>
+    <label>Nome<input id="f-nome" value="${esc(f.nome)}" placeholder="Ex.: Ana Souza"></label>
+    <label>Função<input id="f-funcao" value="${esc(f.funcao)}" placeholder="Ex.: caixa, reposição, entrega"></label>
+    <div class="dupla"><label>Telefone<input id="f-tel" type="tel" value="${esc(f.tel)}" placeholder="Opcional"></label>
+      <label>Horas por semana<input id="f-meta" type="number" min="0" max="80" value="${f.meta}"></label></div>
+    <div class="botoes">${novo ? '' : '<button class="btn perigo" id="f-apagar">Tirar da equipe</button>'}<button class="btn verde" id="f-salvar" ${novo ? 'style="grid-column: 1 / -1"' : ''}>Salvar</button></div>`);
+  document.getElementById('f-salvar').onclick = () => {
+    const nome = document.getElementById('f-nome').value.trim();
+    if (!nome) { aviso('Escreve o nome'); return; }
+    if (dados.equipe.some(x => x.nome === nome && x.id !== f.id)) { aviso('Já tem alguém com esse nome'); return; }
+    Object.assign(f, { nome, funcao: document.getElementById('f-funcao').value.trim(), tel: document.getElementById('f-tel').value.trim(), meta: Number(document.getElementById('f-meta').value) || 0 });
+    if (novo) dados.equipe.push(f);
+    if (!novo && nomeAntigo !== nome) { dados.turnos.forEach(t => { if (t.pessoa === nomeAntigo) t.pessoa = nome; }); dados.atividades.forEach(a => { if (a.pessoa === nomeAntigo) a.pessoa = nome; }); }
+    salvar(); fecharFolha(); aviso('Salvo'); desenhar();
+  };
+  const ap = document.getElementById('f-apagar');
+  if (ap) ap.onclick = () => { dados.equipe = dados.equipe.filter(x => x.id !== f.id); salvar(); fecharFolha(); aviso('Tirado da equipe (os horários antigos ficam)'); desenhar(); };
+}
+
+// ---------- boas-vindas (1ª vez) e ajustes ----------
+function boasVindas() {
+  const b = document.createElement('div'); b.className = 'boas'; b.id = 'boas';
+  b.innerHTML = `<div class="caixa"><img class="logo-grande" src="logo-econtrole.png" alt="E-Controle"><h2>Bem-vindo ao <span>E-controle</span></h2>
+    <p>Sua agenda do dia e as horas da equipe, num lugar só. Tudo fica salvo neste aparelho.</p>
+    <label>Como você se chama?<input id="b-nome" placeholder="Seu nome"></label>
+    <label>Nome da empresa / loja<input id="b-empresa" value="${esc(dados.config.empresa)}"></label>
+    <label>A semana começa no<select id="b-semana"><option value="seg">Segunda</option><option value="dom">Domingo</option></select></label>
+    <input type="checkbox" id="b-equipe" hidden>
+    <button class="btn verde" id="b-ok">Começar</button></div>`;
+  document.body.append(b);
+  document.getElementById('b-semana').value = dados.config.semana;
+  document.getElementById('b-ok').onclick = () => {
+    const nome = document.getElementById('b-nome').value.trim();
+    if (!nome) { aviso('Escreve seu nome'); return; }
+    dados.config.nome = nome; dados.config.empresa = document.getElementById('b-empresa').value.trim() || 'Minha empresa';
+    dados.config.semana = document.getElementById('b-semana').value; semanaVista = inicioSemana(new Date());
+    if (!dados.equipe.length && document.getElementById('b-equipe').checked) EQUIPE_PADRAO.forEach(n => dados.equipe.push({ id: id(), nome: n, funcao: '', tel: '', meta: 44 }));
+    salvar(); b.remove(); aviso('Prontinho, ' + nome + '!'); desenhar();
+  };
+}
+document.getElementById('ajustes').onclick = () => {
+  abrirFolha(`<h2>Ajustes</h2>
+    <label>Seu nome<input id="a-nome" value="${esc(dados.config.nome)}"></label>
+    <label>Nome da empresa / loja<input id="a-empresa" value="${esc(dados.config.empresa)}"></label>
+    <label>A semana começa no<select id="a-semana"><option value="seg">Segunda</option><option value="dom">Domingo</option></select></label>
+    <label>Cada turno tem quantas horas<input id="a-jornada" type="number" min="1" max="14" step="0.5" value="${dados.config.jornada || 8}"></label>
+    <button class="btn verde" id="a-salvar">Salvar</button>`);
+  document.getElementById('a-semana').value = dados.config.semana;
+  document.getElementById('a-salvar').onclick = () => {
+    dados.config.nome = document.getElementById('a-nome').value.trim(); dados.config.empresa = document.getElementById('a-empresa').value.trim() || 'Minha empresa';
+    dados.config.semana = document.getElementById('a-semana').value; semanaVista = inicioSemana(new Date());
+    dados.config.jornada = Number(document.getElementById('a-jornada').value) || 8;
+    salvar(); fecharFolha(); aviso('Ajustes salvos'); desenhar();
+  };
+};
+
+// ---------- exportar o que a página mostra (WhatsApp, copiar ou planilha) ----------
+function baixarArquivo(conteudo, nome, tipo) {
+  if (window.Nativo) { window.Nativo.postMessage(JSON.stringify({ tipo: 'arquivo', nome, conteudo, texto: '' })); return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([conteudo], { type: tipo })); a.download = nome; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+async function mandarTexto(texto) {
+  if (window.Nativo) { window.Nativo.postMessage(JSON.stringify({ tipo: 'texto', texto })); return; }
+  if (navigator.share) { try { await navigator.share({ text: texto }); return; } catch (e) { return; } }
+  try { await navigator.clipboard.writeText(texto); aviso('Copiado, cola no WhatsApp'); } catch (e) {}
+}
+function exportarPagina(titulo, texto, csv, nome) {
+  abrirFolha(`<h2>Exportar · ${esc(titulo)}</h2>
+    <div class="acoes-exp"><button class="grande verde" id="x-zap"><b>💬</b>WhatsApp</button><button class="grande" id="x-copiar"><b>📋</b>Copiar</button><button class="grande" id="x-csv"><b>📊</b>Planilha</button></div>`);
+  document.getElementById('x-zap').onclick = () => mandarTexto(texto);
+  document.getElementById('x-copiar').onclick = async () => { try { await navigator.clipboard.writeText(texto); aviso('Copiado'); } catch (e) { aviso('Não deu pra copiar neste aparelho'); } };
+  document.getElementById('x-csv').onclick = () => baixarArquivo('﻿' + csv, nome + '.csv', 'text/csv');
+}
+
+// ---------- EXPORTAR ----------
+let exportPessoa = '';
+function textoEscala(pessoa) {
+  const ini = semanaVista, fim = new Date(ini); fim.setDate(fim.getDate() + 6);
+  const ts = turnosDaSemana(ini).filter(t => !pessoa || t.pessoa === pessoa);
+  let txt = `${dados.config.empresa.toUpperCase()} — ESCALA ${pessoa ? 'de ' + pessoa.toUpperCase() : 'GERAL'}\nSemana ${br(isoDia(ini))} a ${br(isoDia(fim))}\n`;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(ini); d.setDate(d.getDate() + i); const dia = isoDia(d);
+    const doDia = ts.filter(t => t.data === dia);
+    txt += `\n${DIAS[d.getDay()].toUpperCase()} ${br(dia).slice(0, 5)}\n`;
+    txt += doDia.length ? doDia.map(t => (t.folga ? `  FOLGA  ${pessoa ? '' : t.pessoa}` : `  ${t.inicio}–${t.fim}  ${pessoa ? '' : t.pessoa}${t.funcao ? ' (' + t.funcao + ')' : ''}`).replace(/\s+$/, '')).join('\n') + '\n' : '  ninguém\n';
+  }
+  const pessoas = pessoa ? [pessoa] : [...new Set(ts.map(t => t.pessoa))];
+  txt += '\nTOTAL DE HORAS\n' + (pessoas.length ? pessoas.map(p => `  ${p}: ${fmtH(ts.filter(t => t.pessoa === p).reduce((s, t) => s + horas(t), 0))}`).join('\n') : '  ninguém escalado') + '\n';
+  return txt;
+}
+function csvEscala(pessoa) {
+  const ts = turnosDaSemana(semanaVista).filter(t => !pessoa || t.pessoa === pessoa);
+  return 'Pessoa;Dia;Data;Entra;Sai;Horas;Função\n' + ts.map(t => [t.pessoa, DIAS[deIso(t.data).getDay()], br(t.data), t.folga ? 'FOLGA' : t.inicio, t.folga ? '' : t.fim, fmtH(horas(t)), t.funcao || ''].join(';')).join('\n');
+}
+function telaExportar() {
+  const ini = semanaVista, fim = new Date(ini); fim.setDate(fim.getDate() + 6);
+  const txt = textoEscala(exportPessoa);
+  document.getElementById('tela').innerHTML = `
+    <div class="dia-nav"><button id="ant" aria-label="Semana anterior">‹</button>
+      <div class="titulo"><b>Exportar escala</b><small>${br(isoDia(ini))} a ${br(isoDia(fim))}</small></div>
+      <button id="prox" aria-label="Próxima semana">›</button></div>
+    <div class="passo"><span>1</span> De quem?</div>
+    <select id="quem-exp" class="sel-grande"><option value="">Escala geral (todos)</option>${dados.pessoas.map(p => `<option ${exportPessoa === p ? 'selected' : ''} value="${esc(p)}">${esc(p)}</option>`).join('')}</select>
+    <div class="passo"><span>2</span> Como mandar?</div>
+    <div class="acoes-exp">
+      <button class="grande verde" id="compartilhar"><b>💬</b>WhatsApp</button>
+      <button class="grande" id="copiar"><b>📋</b>Copiar</button>
+      <button class="grande" id="baixar-csv"><b>📊</b>Planilha</button>
+    </div>
+    <div class="secao"><h2>Dados</h2>
+      <div class="botoes"><button class="btn verde" id="zap-dados">📤 Mandar dados</button><button class="btn ouro" id="restaurar">📥 Receber dados</button></div>
+      <input type="file" id="arquivo-backup" accept="application/json,.json,text/plain" hidden></div>`;
+  const muda = n => { const x = new Date(semanaVista); x.setDate(x.getDate() + 7 * n); semanaVista = x; desenhar(); };
+  document.getElementById('ant').onclick = () => muda(-1);
+  document.getElementById('prox').onclick = () => muda(1);
+  document.getElementById('quem-exp').onchange = e => { exportPessoa = e.target.value; desenhar(); };
+  const nomeArq = (ext) => 'escala-' + (exportPessoa || 'geral').toLowerCase().replace(/\s+/g, '-') + '-' + br(isoDia(semanaVista)).replace(/\//g, '-') + '.' + ext;
+  const baixar = (conteudo, nome, tipo) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([conteudo], { type: tipo })); a.download = nome; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  document.getElementById('copiar').onclick = async () => { try { await navigator.clipboard.writeText(txt); aviso('Copiado'); } catch (e) { aviso('Segura no texto pra copiar'); } };
+  document.getElementById('compartilhar').onclick = () => mandarTexto(txt);
+  document.getElementById('baixar-csv').onclick = () => baixarArquivo('﻿' + csvEscala(exportPessoa), nomeArq('csv'), 'text/csv');
+  const _bk = () => baixar(JSON.stringify(dados, null, 2), 'e-controle-backup-' + br(isoDia(new Date())).replace(/\//g, '-') + '.json', 'application/json');
+  const arq = document.getElementById('arquivo-backup');
+  const nomeBackup = () => 'e-controle-dados-' + br(isoDia(new Date())).replace(/\//g, '-') + '.json';
+  document.getElementById('zap-dados').onclick = async () => {
+    const json = JSON.stringify(dados);
+    if (window.Nativo) { baixarArquivo(json, nomeBackup(), 'application/json'); return; }
+    const file = new File([json], nomeBackup(), { type: 'application/json' });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'Dados E-controle' });
+      else if (navigator.share) await navigator.share({ title: 'Dados E-controle', text: json });
+      else { await navigator.clipboard.writeText(json); aviso('Copiado: cola no WhatsApp'); }
+    } catch (e) {}
+  };
+  document.getElementById('restaurar').onclick = () => {
+    abrirFolha(`<h2>Receber dados</h2><p class="dica-grade">Escolhe o arquivo .json que veio pelo WhatsApp, ou cola o texto dele aqui embaixo. Os dados atuais deste aparelho serão trocados.</p>
+      <button class="btn ouro" id="i-arquivo">Escolher arquivo</button>
+      <label>Ou cola o texto<textarea id="i-texto" rows="5" placeholder='{"atividades": ...}'></textarea></label>
+      <button class="btn verde" id="i-ok">Importar texto colado</button>`);
+    document.getElementById('i-arquivo').onclick = () => arq.click();
+    document.getElementById('i-ok').onclick = () => importar(document.getElementById('i-texto').value);
+  };
+  function importar(txt) {
+    try { const d = JSON.parse(txt); if (!d.atividades || !d.turnos) throw 0;
+      dados = Object.assign({ atividades: [], turnos: [], equipe: [], config: dados.config }, d); dados.equipe = dados.equipe || [];
+      Object.defineProperty(dados, 'pessoas', { get: () => dados.equipe.map(f => f.nome), set: () => {}, enumerable: false, configurable: true });
+      salvar(); fecharFolha(); aviso('Dados recebidos'); desenhar(); }
+    catch (e) { aviso('Esse arquivo não é de dados do E-controle'); }
+  }
+  arq.onchange = async () => { if (arq.files[0]) importar(await arq.files[0].text()); arq.value = ''; };
+}
+
+// ---------- folha (formulário que sobe de baixo) ----------
+function abrirFolha(html) {
+  fecharFolha();
+  const f = document.createElement('div'); f.className = 'fundo'; f.id = 'fundo';
+  f.innerHTML = `<div class="folha" role="dialog" aria-modal="true">${html}<button class="btn" id="f-fechar">Cancelar</button></div>`;
+  f.onclick = e => { if (e.target === f) fecharFolha(); };
+  document.body.append(f);
+  document.getElementById('f-fechar').onclick = fecharFolha;
+  const primeiro = f.querySelector('input'); if (primeiro && !primeiro.value) setTimeout(() => primeiro.focus(), 50);
+}
+function fecharFolha() { const f = document.getElementById('fundo'); if (f) f.remove(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharFolha(); });
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+desenhar();
+if (!dados.config.nome) boasVindas();
+</script>
+</body>
+</html>
